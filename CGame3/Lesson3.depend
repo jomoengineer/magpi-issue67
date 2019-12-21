@@ -390,3 +390,101 @@
 	<intrin.h>
 	<arm_neon.h>
 
+1576901066 source:/home/jomotinker/development/GameDev/MagPiChanges/magpi-issue67/CGame3/Source/Game.cpp
+	"Game.h"
+	"SimpleObj.h"
+
+1576901066 /home/jomotinker/development/GameDev/MagPiChanges/magpi-issue67/CGame3/Headers/Game.h
+	"OGL.h"
+
+1576902688 /home/jomotinker/development/GameDev/MagPiChanges/magpi-issue67/CGame3/Headers/OGL.h
+	<stdio.h>
+	<iostream>
+	<sys/time.h>
+	<EGL/egl.h>
+	<EGL/eglext.h>
+	<GLES2/gl2.h>
+
+1523909660 /usr/include/arm-linux-gnueabihf/sys/time.h
+	<features.h>
+	<bits/types.h>
+	<bits/types/time_t.h>
+	<bits/types/struct_timeval.h>
+	<sys/select.h>
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/types.h
+	<features.h>
+	<bits/wordsize.h>
+	<bits/typesizes.h>
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/wordsize.h
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/typesizes.h
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/types/time_t.h
+	<bits/types.h>
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/types/struct_timeval.h
+	<bits/types.h>
+
+1523909660 /usr/include/arm-linux-gnueabihf/sys/select.h
+	<features.h>
+	<bits/types.h>
+	<bits/select.h>
+	<bits/types/sigset_t.h>
+	<bits/types/time_t.h>
+	<bits/types/struct_timeval.h>
+	<bits/types/struct_timespec.h>
+	<bits/select2.h>
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/select.h
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/types/sigset_t.h
+	<bits/types/__sigset_t.h>
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/types/__sigset_t.h
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/types/struct_timespec.h
+	<bits/types.h>
+
+1523909660 /usr/include/arm-linux-gnueabihf/bits/select2.h
+
+1576901066 /home/jomotinker/development/GameDev/MagPiChanges/magpi-issue67/CGame3/Headers/SimpleObj.h
+	<string>
+	"OGL.h"
+
+1576901066 source:/home/jomotinker/development/GameDev/MagPiChanges/magpi-issue67/CGame3/Source/MagPiHelloTriangle.cpp
+	"Game.h"
+
+1576902631 source:/home/jomotinker/development/GameDev/MagPiChanges/magpi-issue67/CGame3/Source/OGL.cpp
+	<cstdio>
+	<cstdlib>
+	<cstring>
+	"OGL.h"
+	<assert.h>
+	<X11/Xlib.h>
+	<X11/Xatom.h>
+	<X11/Xutil.h>
+	"stb_image.h"
+
+1576395095 /home/jomotinker/development/GameDev/MagPiChanges/magpi-issue67/CGame3/Source/stb_image.h
+	"stb_image.h"
+	<stdio.h>
+	<stdlib.h>
+	<stdarg.h>
+	<stddef.h>
+	<stdlib.h>
+	<string.h>
+	<limits.h>
+	<math.h>
+	<stdio.h>
+	<assert.h>
+	<stdint.h>
+	<emmintrin.h>
+	<intrin.h>
+	<arm_neon.h>
+
+1576901066 source:/home/jomotinker/development/GameDev/MagPiChanges/magpi-issue67/CGame3/Source/SimpleObj.cpp
+	<iostream>
+	"SimpleObj.h"
+

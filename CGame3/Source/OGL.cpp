@@ -1,30 +1,40 @@
+/*
+ * OGL.cpp
+ */
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include  "OGL.h"
 #include <assert.h> // assert is a way of making sure that things are what we expect and if not it will stop and tell us.
+#include  <X11/Xlib.h>
+#include  <X11/Xatom.h>
+#include  <X11/Xutil.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
+#define EGL_FALSE            0
+#define EGL_TRUE            1
+// X11 related local variables
+static Display *x_display = NULL;
+
+
 using namespace std;
 
 /*  For beginners this might be a bit too much, but just include the file for now and use the OGL.h file when you need to use
 	OpenGLES2.0 instructions.
-
 	In order to set up a screen, we will need to ask the video system to create a couple of buffer areas with
 	the right type of pixels and also indicate some of the hardware features we want to switch on. This is done using EGL libs.
-
 	The process of setting up a graphic screen is a little technical but mainly we must create an EGLscreen
 	which itself is optimised on RaspPi to use a special format our Broadcom GPU givs us for its display, all handled in
 	the bcm_host.h file so we can forget about it, but we do need to tell EGL we are using DISPMANX systems
-
 	Once we have our EGL/DISMPANX surface and displays systems it means OpenGLES2.0 has something to work with and we can
 	draw things using our shaders.
 	For convenience we will set up a simple default shader, but normally we would have a few different ones for different
 	effects.
-
 	You can totally ignore the contents of this file until you feel you want to explore how to set things up, but do make
 	sure you have an #include OGL.h in any class that wants to play with OpenGL and that you double check that you create
 	an instance of OGL and call its init() method to set it all up of us.
-
 	Also note this file makes use of fprintf instead of cout, its just a tidier way to format printed text.
-
 */
 
 OGL::OGL() {};
@@ -64,6 +74,12 @@ static const EGLint context_attributes[] =
 	EGL_NONE
 };
 
+// This will set up the Broadcomm GPU version of an EGL display,
+
+//
+// CreateEGLContext()
+//
+//    Creates an EGL rendering context and all associated elements
 
 /* We've added a simple routine to create textures
  Create a texture with width and height
@@ -100,100 +116,196 @@ GLuint OGL::CreateTexture2D(int width, int height,  char* TheData)
 	return textureId;
 }
 
-// This will set up the Broadcomm GPU version of an EGL display,
-
-void OGL::init_EGL(Target_State *state, int width, int height)
+void OGL::esInitContext(Target_State *state)
 {
+   if ( state != NULL )
+   {
+      memset( state, 0, sizeof( Target_State) );
+   }
+   else
+   {
+       std::cout << "Failed to memset state" << std::endl;
+   }
+}
+//void OGL::init_EGL(Target_State *state, int width, int height, int FBResX, int FBResY)
+void OGL::init_EGL(Target_State *state, int width, int height)
 
+{
+#define ES_WINDOW_RGB           0
 
-	std::cout << "init openGLES started\n";
+    std::cout << "init openGLES started\n";
 
+    state->width = width;
+    state->height = height;
 
-// first set up some local variables we will need to work with
-	int32_t success = 0;
-	EGLBoolean result;
-	EGLint num_config;
+    EGLint numConfigs;
+    EGLint majorVersion;
+    EGLint minorVersion;
+    EGLDisplay display;
+    EGLContext context;
+    EGLSurface surface;
+    EGLConfig config;
+    EGLint contextAttribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE, EGL_NONE };
+    EGLint attribute_list[] =
+    {
+       EGL_RED_SIZE,       5,
+       EGL_GREEN_SIZE,     6,
+       EGL_BLUE_SIZE,      5,
+       EGL_ALPHA_SIZE,     (ES_WINDOW_RGB & ES_WINDOW_ALPHA) ? 8 : EGL_DONT_CARE,
+       EGL_DEPTH_SIZE,     (ES_WINDOW_RGB & ES_WINDOW_DEPTH) ? 8 : EGL_DONT_CARE,
+       EGL_STENCIL_SIZE,   (ES_WINDOW_RGB & ES_WINDOW_STENCIL) ? 8 : EGL_DONT_CARE,
+       EGL_SAMPLE_BUFFERS, (ES_WINDOW_RGB & ES_WINDOW_MULTISAMPLE) ? 1 : 0,
+       EGL_NONE
+   };
+//    EGLint result = eglChooseConfig(state->display, attribute_list, &config, 1, &numConfigs);
 
-	DISPMANX_ELEMENT_HANDLE_T dispman_element;
-	DISPMANX_DISPLAY_HANDLE_T dispman_display;
-	DISPMANX_UPDATE_HANDLE_T dispman_update;
-	VC_RECT_T dst_rect;
-	VC_RECT_T src_rect;
+      /* create a native window */
 
-	EGLConfig config;
+    Window root;
+    XSetWindowAttributes swa;
+    XSetWindowAttributes  xattr;
+    Atom wm_state;
+    XWMHints hints;
+    XEvent xev;
+    EGLConfig ecfg;
+    EGLint num_config;
+    Window win;
+    Screen *screen;
+    eglBindAPI(EGL_OPENGL_ES_API);
+    /*
+     * X11 native display initialization
+     */
+    // WinCreate
+    x_display = XOpenDisplay(NULL);
 
-// now lets do the work and set things up
-	memset(state, 0, sizeof(Target_State)); // we need to make sure the state is clear
+    if (x_display == NULL)
+    {
+        return; // we need to trap this;
+    }
+    root = DefaultRootWindow(x_display);
+    screen = ScreenOfDisplay(x_display, 0);
+    width = screen->width;
+    height = screen->height; // resplution of screen
 
-// get an EGL display connection
-	state->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    state->width = width;
+    state->height = height;
 
-// initialize the EGL display connection
-	result = eglInitialize(state->display, NULL, NULL);
-	assert(EGL_FALSE != result); // just in case, we should test it.
+    swa.event_mask  =  ExposureMask | PointerMotionMask | KeyPressMask | KeyReleaseMask;
+    swa.background_pixmap = None;
+    swa.background_pixel  = 0;
+    swa.border_pixel      = 0;
+    swa.override_redirect = true;
 
-// get an appropriate EGL frame buffer configuration
-	result = eglChooseConfig(state->display, attribute_list, &config, 1, &num_config);
-	assert(EGL_FALSE != result);
+    win = XCreateWindow(
+        x_display,
+        root,
+        0,
+        0,
+        width,
+        height,
+        0,
+        CopyFromParent,
+        InputOutput,
+        CopyFromParent,
+        CWEventMask,
+        &swa);
 
-// get an appropriate EGL frame buffer configuration
-	result = eglBindAPI(EGL_OPENGL_ES_API);
-	assert(EGL_FALSE != result);
+    XSelectInput(x_display, win, KeyPressMask | KeyReleaseMask);
 
+    xattr.override_redirect = FALSE;
+    XChangeWindowAttributes(x_display, win, CWOverrideRedirect, &xattr);
 
-// create an EGL rendering context
-	state->context = eglCreateContext(state->display, config, EGL_NO_CONTEXT, context_attributes);
-	assert(state->context != EGL_NO_CONTEXT);
+    hints.input = TRUE;
+    hints.flags = InputHint;
+    XSetWMHints(x_display, win, &hints);
 
-// create an EGL window surface
-	success = graphics_get_display_size(0 /* LCD */, &state->width, &state->height);
-	assert(success >= 0);
+    std::cout << "config openGLES X11 window\n";
+    char* title = (char*)"x11 window Maze3dHunt";
+        // make the window visible on the screen
+    XMapWindow(x_display, win);
+    XStoreName(x_display, win, title);
 
-// ok now that the EGL is all set up, lets give it some important info so that our display manager can make a window
+        // get identifiers for the provided atom name strings
+    wm_state = XInternAtom(x_display, "_NET_WM_STATE", FALSE);
+    memset(&xev, 0, sizeof(xev));
+    xev.type                 = ClientMessage;
+    xev.xclient.window       = win;
+    xev.xclient.message_type = wm_state;
+    xev.xclient.format       = 32;
+    xev.xclient.data.l[0]    = 1;
+    xev.xclient.data.l[1]    = FALSE;
+    XSendEvent(
+      x_display,
+        DefaultRootWindow(x_display),
+        FALSE,
+        SubstructureNotifyMask,
+        &xev);
 
-	state->width = width;
-	state->height = height;
+    std::cout << "Initialized XInternAtom\n";
+    state->nativewindow = (EGLNativeWindowType) win;
 
-	dst_rect.x = 160; // gives us a slight offset away from the top left corner
-	dst_rect.y = 160;
-	dst_rect.width = width;
-	dst_rect.height = height;
+    //  CreateEGLContext
+    // Get Display
+    //display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    display = eglGetDisplay((EGLNativeDisplayType)x_display);
+    if (display == EGL_NO_DISPLAY)
+    {
+        return; // EGL_FALSE;
+    }
 
-	src_rect.x = 16;
-	src_rect.y = 16;
-	src_rect.width = width << 16;
-	src_rect.height = height << 16;
+    // Initialize EGL
+    if (!eglInitialize(display, &minorVersion,&majorVersion))
+    {
 
-// now tell the hardware to make the display open to us
-	dispman_display = vc_dispmanx_display_open(0 /* LCD */);
-	dispman_update = vc_dispmanx_update_start(0);
+        EGLint err = eglGetError();
+        return;// EGL_FALSE;
+    }
 
-	dispman_element = 	vc_dispmanx_element_add(dispman_update,
-		dispman_display,
-		0/*layer*/,
-		&dst_rect,
-		0/*src*/,
-		&src_rect,
-		DISPMANX_PROTECTION_NONE,
-		0 /*alpha*/,
-		0/*clamp*/,
-		(DISPMANX_TRANSFORM_T) 0/*transform*/);
-// tell our Target_stat structure what we have
+    // Get configs
+    if (!eglGetConfigs(display, NULL, 0, &numConfigs))
+    {
+        return;// EGL_FALSE;
+    }
 
-	state->nativewindow.element = dispman_element;
-	state->nativewindow.width = state->width;
-	state->nativewindow.height = state->height;
-	vc_dispmanx_update_submit_sync(dispman_update);
-// now that the display is ready, we have to have a surgace our OpenGLES2.0 systems will draw to,
+    // Choose config
+    if (!eglChooseConfig(display, attribute_list, &config, 1, &numConfigs))
+    {
+        return;// EGL_FALSE;
+    }
 
-	state->surface = eglCreateWindowSurface(state->display, config, &(state->nativewindow), NULL);
-	assert(state->surface != EGL_NO_SURFACE);
-// connect the context to the surface
-	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
-	assert(EGL_FALSE != result);
+    // Create a surface
+    surface = eglCreateWindowSurface(display, config, state->nativewindow, NULL);
+    if (surface == EGL_NO_SURFACE)
+    {
+        std::cout << "Failed to Create Window Surface\n";
+        return;// EGL_FALSE;
+    }
 
-// if we got through all that ok, we have a display screen ready for us
-	std::cout << "init openGLES finished\n";
+    // Create a GL context
+    context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttribs);
+    if (context == EGL_NO_CONTEXT)
+    {
+        return;// EGL_FALSE;
+    }
+
+    // Make the context current
+    if (!eglMakeCurrent(display, surface, surface, context))
+    {
+        return;// EGL_FALSE;
+    }
+
+    state->display = display;
+    state->surface = surface;
+    state->context = context;
+    //return;// EGL_TRUE;
+
+    std::cout << "Print CPU info\n";
+    printf("This GPU supplied by  :%s\n", glGetString(GL_VENDOR));
+    printf("This GPU supports     :%s\n", glGetString(GL_VERSION));
+    printf("This GPU Renders with :%s\n", glGetString(GL_RENDERER));
+    printf("This GPU supports     :%s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+    printf("This GPU supports these extensions    :%s\n", glGetString(GL_EXTENSIONS));
+
 
 }
 
@@ -246,16 +358,16 @@ GLuint OGL::LoadShader(GLenum type, const char *shaderSrc)
 //
 int OGL::Init()
 {
-// once the BCM has been initialsed and EGL/DISPMANX is up and runnng, all re really need now is some shaders to work with
-// since OpenGLES can't actually draw without them, so we will set up a very simple default pair of shaders, and turn them
-// into a Program Object which we will set as the default
+	//bcm_host_init(); // make sure we have set up our Broadcom
+    //ESContext esContext;
+    //programObject userData;
 
+    esInitContext(&state);
+    //state.userData = &userData;
+	//init_EGL(&state, 1024, 768); // this will set up the EGL stuff, its complex so put in a seperate method
+	init_EGL(&state, 320, 240); // this will set up the EGL stuff, its complex so put in a seperate method
 
-	bcm_host_init(); // make sure we have set up our Broadcom
-
-	init_EGL(&state, 1024, 768); // this will set up the EGL stuff, its complex so put in a seperate method
-
-	// HERE we will load in our graphic image to play with and convert it into a texture
+		// HERE we will load in our graphic image to play with and convert it into a texture
 	int Grwidth, Grheight, comp; // these are variables we will use to get info
 
 // this is a strange instruction with * and & symbols which we'll discuss soon, but what it does is simple
@@ -263,7 +375,7 @@ int OGL::Init()
 	unsigned char *data = stbi_load("images/MagPicomp.png", &Grwidth, &Grheight, &comp, 4); // ask it to load 4 componants since its rgba
 
 	//now its loaded we have to create a texture, which will have a "handle" ID that can be stored, we have added a nice function to make this easy
-	 textureID = CreateTexture2D(Grwidth, Grheight, (char*) data); //just pass the width and height of the graphic, and where it is located and we can make a texture
+    textureID = CreateTexture2D(Grwidth, Grheight, (char*) data); //just pass the width and height of the graphic, and where it is located and we can make a texture
 
 /*
  *
@@ -272,17 +384,16 @@ int OGL::Init()
  **/
 
 
+// we'll need a base colour to clear the screen this sets it up here (we can change it anytime
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-// we'll need a base colour to clear the screen this sets it up here (we can change it anytime), our test graphic is very black
-// so we'll go for a magenta colour so we can see it
-	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+// once the BCM has been initialsed and EGL/DISPMANX is up and runnng, all re really need now is some shaders to work with
+// since OpenGLES can't actually draw without them, so we will set up a very simple default pair of shaders, and turn them
+// into a Program Object which we will set as the default
 
 
 // this is our shader code, contained in an array of text
 // there are much better ways to do this, we will cover later
-// This v2 shader code can now handle textures but its doing similar things
-
-
 	GLbyte vShaderStr[] =
 		"attribute vec4 a_position;\n"
 		"uniform vec4 u_position;\n"
@@ -294,16 +405,13 @@ int OGL::Init()
 		"}\n";
 
 	GLbyte fShaderStr[] =
-			"precision mediump float;\n"
+        "precision mediump float;\n"
 		"varying vec2 v_texCoord;\n"
 		"uniform sampler2D s_texture;\n"
 		"void main()\n"
 	    "{\n"
         "gl_FragColor = texture2D( s_texture, v_texCoord );\n"
         "}\n";
-
-
-
 // shaders next, lets create variables to hold these
 	GLuint vertexShader, fragmentShader; // we need some variables
 
@@ -353,7 +461,7 @@ int OGL::Init()
 		return FALSE;
 	}
 
+
 	glUseProgram(programObject); // we only plan to use 1 program object so tell openGL to use this one
 	return TRUE;
 }
-
